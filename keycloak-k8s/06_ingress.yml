@@ -1,0 +1,23 @@
+apiVersion: networking.auth-istio.io/v1alpha3
+kind: VirtualService
+metadata:
+  name: keycloak
+  namespace: backend
+spec:
+  hosts:
+    - "*"
+  gateways:
+    - api-gateway
+  http:
+    - match:
+        - uri:
+            prefix: "/realms"
+        - uri:
+            prefix: "/admin"
+        - uri:
+            prefix: "/health"
+      route:
+        - destination:
+            host: keycloak.backend.svc.cluster.local
+            port:
+              number: 80

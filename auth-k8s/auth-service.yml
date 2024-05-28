@@ -1,0 +1,44 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: auth
+  namespace: backend
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: auth
+  template:
+    metadata:
+      labels:
+        app: auth
+        sidecar.istio.io/inject: "true"
+    spec:
+      containers:
+        - name: auth
+          image: devopszms2024/zms-devops-auth-service:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8080
+          envFrom:
+            - configMapRef:
+                name: auth-configmap
+            - configMapRef:
+                name: mongodb-auth-configmap
+            - secretRef:
+                name: mongodb-auth-secret
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: auth
+  namespace: backend
+spec:
+  selector:
+    app: auth
+  ports:
+    - protocol: TCP
+      name: http
+      port: 8080
+      targetPort: 8080

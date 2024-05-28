@@ -1,0 +1,148 @@
+name: "Merge - Auth service"
+
+on:
+  pull_request:
+    types:
+      - closed
+    branches:
+      - main
+      - develop
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    if: github.event.pull_request.merged == true
+    name: "Build"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+ 
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+         go-version-file: 'auth-service/go.mod'
+         check-latest: true
+         cache-dependency-path: |
+           auth-service/go.mod
+
+      - name: Clear Go modules cache directory
+        run: sudo rm -rf ~/go/pkg/mod
+
+      - name: Cache go modules
+        uses: actions/cache@v4
+        with:
+         path: |
+           ~/.cache/go-build
+           ~/go/pkg/mod
+         key: ${{ runner.os }}-go-${{ hashFiles('**/auth-service/go.sum') }}
+         restore-keys: |
+           ${{ runner.os }}-go-
+ 
+      - name: Install dependencies
+        working-directory: auth-service
+        run: go get .
+ 
+      - name: Build
+        working-directory: auth-service
+        run: go build -v ./...
+ 
+      - name: Test
+        working-directory: auth-service
+        run: go test -v ./...
+  
+  sonar-cloud:
+    needs: build
+    name: SonarCloud
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: SonarCloud Scan
+        uses: sonarsource/sonarcloud-github-action@master
+        with:
+          projectBaseDir: auth-service
+          args: >
+            -Dsonar.organization=zms-devops
+            -Dsonar.projectKey=ZMS-DevOps_auth-service
+            -Dsonar.python.coverage.reportPaths=coverage.xml
+            -Dsonar.sources=.
+            -Dsonar.test.exclusions=**/tests/**
+            -Dsonar.verbose=true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+
+  semantic-versioning: 
+    if: github.event.pull_request.merged == true
+    name: Semantic Versioning
+    runs-on: ubuntu-latest
+    outputs:
+      image-tag: ${{ steps.get-tag.outputs.new_tag }}
+    permissions:
+      contents: write
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: '0'
+    - name: Get tag
+      id: get-tag
+      uses: anothrNick/github-tag-action@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        WITH_V: false
+        MAJOR_STRING_TOKEN: breaking-change
+        MINOR_STRING_TOKEN: feat
+        PATCH_STRING_TOKEN: fix
+
+  push-to-registry:
+    name: Push Docker image to Docker Hub
+    needs: [semantic-versioning, sonar-cloud]
+    runs-on: ubuntu-latest
+  
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+ 
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+         go-version-file: 'auth-service/go.mod'
+         check-latest: true
+         cache-dependency-path: |
+           auth-service/go.mod
+
+      - name: Clear Go modules cache directory
+        run: sudo rm -rf ~/go/pkg/mod
+
+      - name: Cache go modules
+        uses: actions/cache@v4
+        with:
+         path: |
+           ~/.cache/go-build
+           ~/go/pkg/mod
+         key: ${{ runner.os }}-go-${{ hashFiles('**/auth-service/go.sum') }}
+         restore-keys: |
+           ${{ runner.os }}-go-
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Build and push Docker image
+        id: push
+        uses: docker/build-push-action@v5
+        with:
+          context: ./auth-service
+          file: ./auth-service/Dockerfile
+          push: true
+          tags: |
+            ${{ secrets.DOCKER_USERNAME }}/${{secrets.DOCKER_IMAGE_NAME}}:${{needs.semantic-versioning.outputs.image-tag}}
+            ${{ secrets.DOCKER_USERNAME }}/${{secrets.DOCKER_IMAGE_NAME}}:latest

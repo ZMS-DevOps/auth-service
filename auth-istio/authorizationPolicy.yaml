@@ -1,0 +1,25 @@
+apiVersion: security.auth-istio.io/v1beta1
+kind: AuthorizationPolicy
+metadata:
+  name: auth
+  namespace: backend
+spec:
+  selector:
+    matchLabels:
+       app: auth
+  rules:
+    - to:
+        - operation:
+            methods: [ "GET", "POST", "PUT" ]
+            paths: [ "/auth/*"]
+    - to:
+        - operation:
+            methods: [ "GET", "POST", "PUT", "DELETE"]
+            paths: [ "/user*" ]
+      from:
+        - source:
+              requestPrincipals: [ "*" ]
+      when:
+        - key: request.auth.claims[realm_access][roles]
+          values: [ "host" ]
+
