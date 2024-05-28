@@ -1,0 +1,15 @@
+version: "3.8"
+
+services:
+  auth_service:
+    image: auth_service
+    container_name: auth_service
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: on-failure
+    environment:
+      SERVICE_PORT: ${SERVICE_PORT}
+      IDENTITY_PROVIDER_HOST: ${IDENTITY_PROVIDER_HOST}
+    ports:
+      - 8080:8080
