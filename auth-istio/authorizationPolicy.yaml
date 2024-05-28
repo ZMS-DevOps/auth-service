@@ -1,4 +1,4 @@
-apiVersion: security.auth-istio.io/v1beta1
+apiVersion: security.istio.io/v1beta1
 kind: AuthorizationPolicy
 metadata:
   name: auth
@@ -21,5 +21,5 @@ spec:
               requestPrincipals: [ "*" ]
       when:
         - key: request.auth.claims[realm_access][roles]
-          values: [ "host" ]
+          values: [ "host", "guest"]
 
