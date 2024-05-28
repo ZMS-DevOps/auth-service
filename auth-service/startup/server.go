@@ -39,6 +39,10 @@ func (server *Server) setupHandlers() {
 	authService := server.initAuthService(verificationStore, keycloakService)
 	authHandler := server.initAuthHandler(authService, emailService)
 	authHandler.Init(server.router)
+
+	userService := server.initUserService(authService, keycloakService)
+	userHandler := server.initUserHandler(userService)
+	userHandler.Init(server.router)
 }
 
 func (server *Server) initKeycloakService() *application.KeycloakService {
@@ -67,4 +71,12 @@ func (server *Server) initMongoClient() *mongo.Client {
 
 func (server *Server) initVerificationStore(client *mongo.Client) domain.VerificationStore {
 	return persistence.NewVerificationMongoDBStore(client)
+}
+
+func (server *Server) initUserService(authService *application.AuthService, keycloakService *application.KeycloakService) *application.UserService {
+	return application.NewUserService(&http.Client{}, authService, keycloakService, server.config.IdentityProviderHost)
+}
+
+func (server *Server) initUserHandler(service *application.UserService) *api.UserHandler {
+	return api.NewUserHandler(service)
 }
