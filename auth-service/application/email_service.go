@@ -43,8 +43,6 @@ func (service *EmailService) getVerificationCodeUrl(receiverEmail string, verifi
 }
 
 func (service *EmailService) executeEmail(receiverEmail string, verification domain.Verification, t *template.Template, body *bytes.Buffer) error {
-	log.Printf(receiverEmail)
-	log.Printf(verification.Id.Hex())
 	return t.Execute(body, struct {
 		Code int
 		Url  string

@@ -8,7 +8,6 @@ import (
 	"github.com/mmmajder/zms-devops-auth-service/domain"
 	"github.com/mmmajder/zms-devops-auth-service/infrastructure/dto"
 	"io"
-	"log"
 	"net/http"
 	"net/url"
 	"strings"
@@ -61,7 +60,6 @@ func (service *KeycloakService) LoginKeycloakUser(email, password string) (io.Re
 
 func (service *KeycloakService) CreateKeycloakUser(signupDTO *dto.KeycloakDTO, authorizationHeader string) (string, error) {
 	jsonBody, err := json.Marshal(signupDTO)
-	log.Printf(signupDTO.Email)
 	if err != nil {
 		return "", err
 	}
@@ -80,7 +78,7 @@ func (service *KeycloakService) CreateKeycloakUser(signupDTO *dto.KeycloakDTO, a
 	if err != nil {
 		return "", err
 	}
-	log.Printf(resp.Status)
+
 	if resp.StatusCode != http.StatusCreated {
 		if resp.StatusCode == http.StatusConflict {
 			return "", errors.New("user exists with same email")
