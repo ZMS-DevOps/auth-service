@@ -89,6 +89,50 @@ func (service *KeycloakService) CreateKeycloakUser(signupDTO *dto.KeycloakDTO, a
 	return service.getUserIdFromLocation(resp)
 }
 
+func (service *KeycloakService) GetKeycloakUser(authorizationHeader string) (io.ReadCloser, error) {
+	req, err := http.NewRequest(
+		http.MethodPost,
+		fmt.Sprintf("%s/protocol/openid-connect/userinfo", service.getDefaultUserConsoleUrl()),
+		nil,
+	)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set(domain.Authorization, authorizationHeader)
+
+	resp, err := service.HttpClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	if resp.StatusCode != http.StatusOK {
+		return nil, errors.New("getting user failed")
+	}
+
+	return resp.Body, nil
+}
+
+func (service *KeycloakService) GetKeycloakUserById(authorizationHeader, id string) (io.ReadCloser, error) {
+	req, err := http.NewRequest(
+		http.MethodGet,
+		fmt.Sprintf("%s/%s?q=address", service.getDefaultAdminConsoleUrl(), id),
+		nil,
+	)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set(domain.Authorization, authorizationHeader)
+
+	resp, err := service.HttpClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	if resp.StatusCode != http.StatusOK {
+		return nil, errors.New("getting user failed")
+	}
+
+	return resp.Body, nil
+}
+
 func (service *KeycloakService) UpdateKeycloakUser(authorizationHeader string, id string, updateUser *dto.UpdateKeycloakUserDTO) (io.ReadCloser, error) {
 	jsonBody, err := json.Marshal(updateUser)
 	if err != nil {
@@ -117,6 +161,56 @@ func (service *KeycloakService) UpdateKeycloakUser(authorizationHeader string, i
 	return resp.Body, nil
 }
 
+func (service *KeycloakService) DeleteKeycloakUser(authorizationHeader, id string) error {
+	req, err := http.NewRequest(
+		http.MethodDelete,
+		fmt.Sprintf("%s/%s", service.getDefaultAdminConsoleUrl(), id),
+		nil,
+	)
+	if err != nil {
+		return err
+	}
+	req.Header.Set(domain.Authorization, authorizationHeader)
+
+	resp, err := service.HttpClient.Do(req)
+	if err != nil {
+		return err
+	}
+
+	if resp.StatusCode != http.StatusNoContent {
+		return errors.New("deleting user failed")
+	}
+	return nil
+}
+
+func (service *KeycloakService) ResetPasswordOfKeycloakUser(authorizationHeader string, id string, requestBody *dto.CredentialsDTO) error {
+	jsonBody, err := json.Marshal(requestBody)
+	if err != nil {
+		return err
+	}
+
+	req, err := http.NewRequest(
+		http.MethodPut,
+		fmt.Sprintf("%s/%s/reset-password", service.getDefaultAdminConsoleUrl(), id),
+		bytes.NewBuffer(jsonBody),
+	)
+	if err != nil {
+		return err
+	}
+	setContentType(req, domain.JsonContentType)
+	req.Header.Set(domain.Authorization, authorizationHeader)
+
+	resp, err := service.HttpClient.Do(req)
+	if err != nil {
+		return err
+	}
+
+	if resp.StatusCode != http.StatusNoContent {
+		return errors.New("resetting user password failed")
+	}
+	return nil
+}
+
 func (service *KeycloakService) getUserIdFromLocation(resp *http.Response) (string, error) {
 	if location := resp.Header.Get(domain.LocationHeader); location != "" {
 		parts := strings.Split(location, "/")
@@ -134,28 +228,6 @@ func (service *KeycloakService) checkIfFieldHasValue(parts []string) string {
 		return lastPart
 	}
 	return ""
-}
-
-func (service *KeycloakService) GetKeycloakUser(authorizationHeader string) (io.ReadCloser, error) {
-	req, err := http.NewRequest(
-		http.MethodPost,
-		fmt.Sprintf("%s/protocol/openid-connect/userinfo", service.getDefaultUserConsoleUrl()),
-		nil,
-	)
-	if err != nil {
-		return nil, err
-	}
-	req.Header.Set(domain.Authorization, authorizationHeader)
-
-	resp, err := service.HttpClient.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	if resp.StatusCode != http.StatusOK {
-		return nil, errors.New("getting user failed")
-	}
-
-	return resp.Body, nil
 }
 
 func setContentType(req *http.Request, contentType string) {
