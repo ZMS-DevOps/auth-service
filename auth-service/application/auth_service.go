@@ -38,7 +38,6 @@ func (service *AuthService) Login(email string, password string) (*dto.LoginDTO,
 	if !service.userIsEnabled(loginDTO) {
 		return nil, errors.New(domain.UserNotVerifiedErrorMessage)
 	}
-
 	return loginDTO, nil
 }
 

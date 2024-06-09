@@ -27,6 +27,11 @@ spec:
                 name: mongodb-auth-configmap
             - secretRef:
                 name: mongodb-auth-secret
+          env:
+            - name: KAFKA_BOOTSTRAP_SERVERS
+              value: "my-kafka.backend.svc.cluster.local:9092"
+            - name: KAFKA_AUTH_PASSWORD
+              value: "6DUnElt7GW"
 
 ---
 apiVersion: v1
@@ -42,3 +47,7 @@ spec:
       name: http
       port: 8080
       targetPort: 8080
+    - protocol: TCP
+      name: grpc
+      port: 8001
+      targetPort: 8001

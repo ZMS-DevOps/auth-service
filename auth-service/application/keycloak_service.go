@@ -120,6 +120,7 @@ func (service *KeycloakService) GetKeycloakUserById(authorizationHeader, id stri
 	if err != nil {
 		return nil, err
 	}
+
 	req.Header.Set(domain.Authorization, authorizationHeader)
 
 	resp, err := service.HttpClient.Do(req)

@@ -3,8 +3,10 @@ package application
 import (
 	"encoding/json"
 	"errors"
+	booking "github.com/ZMS-DevOps/booking-service/proto"
+	"github.com/mmmajder/zms-devops-auth-service/application/external"
+	"github.com/mmmajder/zms-devops-auth-service/domain"
 	"github.com/mmmajder/zms-devops-auth-service/infrastructure/dto"
-	"log"
 	"net/http"
 )
 
@@ -13,15 +15,17 @@ type UserService struct {
 	AuthService          *AuthService
 	KeycloakService      *KeycloakService
 	IdentityProviderHost string
+	bookingClient        booking.BookingServiceClient
 }
 
-func NewUserService(httpClient *http.Client, authService *AuthService, keycloakService *KeycloakService, identityProviderHost string) *UserService {
+func NewUserService(httpClient *http.Client, authService *AuthService, keycloakService *KeycloakService, identityProviderHost string, bookingClient booking.BookingServiceClient) *UserService {
 
 	return &UserService{
 		HttpClient:           httpClient,
 		AuthService:          authService,
 		KeycloakService:      keycloakService,
 		IdentityProviderHost: identityProviderHost,
+		bookingClient:        bookingClient,
 	}
 }
 
@@ -40,7 +44,6 @@ func (service *UserService) GetUser(authorizationHeader string) (*dto.UserDTO, e
 }
 
 func (service *UserService) GetUserById(authorizationHeader, id string) (*dto.UserDTO, error) {
-	log.Printf("GETTING USER ID: %s", id)
 	responseBody, err := service.KeycloakService.GetKeycloakUserById(authorizationHeader, id)
 	if err != nil {
 		return nil, err
@@ -69,9 +72,26 @@ func (service *UserService) UpdateUser(authorizationHeader, id, firstName, lastN
 	return nil
 }
 
-func (service *UserService) DeleteUser(authorizationHeader, id string) error {
-	if err := service.KeycloakService.DeleteKeycloakUser(authorizationHeader, id); err != nil {
-		return err
+func (service *UserService) DeleteUser(authorizationHeader, id, group string) error {
+	var canDeleteUser bool
+	if group == domain.HostRole {
+		response, err := external.IfHostCanBeDeleted(service.bookingClient, id)
+		if err != nil {
+			return err
+		}
+		canDeleteUser = response.Success
+	} else {
+		response, err := external.IfGuestCanBeDeleted(service.bookingClient, id)
+		if err != nil {
+			return err
+		}
+		canDeleteUser = response.Success
+	}
+
+	if canDeleteUser {
+		if err := service.KeycloakService.DeleteKeycloakUser(authorizationHeader, id); err != nil {
+			return err
+		}
 	}
 
 	return nil
