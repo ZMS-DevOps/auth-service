@@ -6,3 +6,5 @@ metadata:
 data:
   SERVICE_PORT: "8080"
   IDENTITY_PROVIDER_HOST: "keycloak.backend.svc.cluster.local"
+  BOOKING_HOST: "booking"
+  BOOKING_PORT: "8001"

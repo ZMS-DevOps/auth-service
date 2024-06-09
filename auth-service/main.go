@@ -12,6 +12,7 @@ func main() {
 	log.SetOutput(os.Stderr)
 	log.SetOutput(os.Stdout)
 	config := cfg.NewConfig()
+
 	server := startup.NewServer(config)
 	server.Start()
 }

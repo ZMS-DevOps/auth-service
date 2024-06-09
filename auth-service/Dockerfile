@@ -1,17 +1,17 @@
-FROM golang:1.22.1 AS builder
-WORKDIR /app
+FROM golang:1.22.1-alpine AS builder
+RUN apk add --no-progress --no-cache gcc musl-dev
+WORKDIR /build
 COPY ./go.mod ./go.sum ./
 RUN go mod download
 COPY . .
-RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o main .
+
+RUN go build -tags musl -ldflags '-extldflags "-static"' -o /build/main
 
 FROM alpine:3.20
-WORKDIR /root/
-COPY --from=builder /app/main .
+WORKDIR /app
+COPY --from=builder /build/main .
 RUN addgroup -S appgroup && adduser -S appuser -G appgroup
-RUN chown root:root /root/main && chmod 755 /root/main
-RUN chmod 555 /root/main
+RUN chown appuser:appgroup /app/main && chmod 555 /app/main
 
-EXPOSE 4000
 USER appuser
-CMD ["./main"]
+ENTRYPOINT ["/app/main"]

@@ -8,6 +8,7 @@ import (
 	"github.com/mmmajder/zms-devops-auth-service/domain"
 	"github.com/mmmajder/zms-devops-auth-service/infrastructure/dto"
 	"io"
+	"log"
 	"net/http"
 	"net/url"
 	"strings"
@@ -120,12 +121,14 @@ func (service *KeycloakService) GetKeycloakUserById(authorizationHeader, id stri
 	if err != nil {
 		return nil, err
 	}
+	log.Printf("step keycloak 1: %s", id)
 	req.Header.Set(domain.Authorization, authorizationHeader)
 
 	resp, err := service.HttpClient.Do(req)
 	if err != nil {
 		return nil, err
 	}
+	log.Printf("step 2: %s", resp.Status)
 	if resp.StatusCode != http.StatusOK {
 		return nil, errors.New("getting user failed")
 	}

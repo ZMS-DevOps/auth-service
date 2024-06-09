@@ -24,7 +24,7 @@ func (handler *UserHandler) Init(router *mux.Router) {
 	router.HandleFunc(domain.UserContextPath+"/{id}", handler.GetUserById).Methods(http.MethodGet)
 	router.HandleFunc(domain.UserContextPath+"/{id}", handler.UpdateUser).Methods(http.MethodPut)
 	router.HandleFunc(domain.UserContextPath+"/{id}/reset-password", handler.ResetPassword).Methods(http.MethodPut)
-	router.HandleFunc(domain.UserContextPath+"/{id}", handler.DeleteUser).Methods(http.MethodDelete)
+	router.HandleFunc(domain.UserContextPath+"/{id}/{group}", handler.DeleteUser).Methods(http.MethodDelete)
 }
 
 func (handler *UserHandler) GetUser(w http.ResponseWriter, r *http.Request) {
@@ -76,7 +76,14 @@ func (handler *UserHandler) DeleteUser(w http.ResponseWriter, r *http.Request) {
 		handleError(w, http.StatusBadRequest, domain.InvalidIDErrorMessage)
 		return
 	}
-	err := handler.service.DeleteUser(r.Header.Get(domain.Authorization), id)
+
+	group := mux.Vars(r)["group"]
+	if group != domain.HostRole && group != domain.GuestRole {
+		handleError(w, http.StatusBadRequest, domain.InvalidGroupErrorMessage)
+		return
+	}
+
+	err := handler.service.DeleteUser(r.Header.Get(domain.Authorization), id, group)
 	if err != nil {
 		handleError(w, http.StatusInternalServerError, err.Error())
 		return

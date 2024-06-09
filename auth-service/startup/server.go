@@ -2,8 +2,10 @@ package api
 
 import (
 	"fmt"
+	booking "github.com/ZMS-DevOps/booking-service/proto"
 	"github.com/gorilla/mux"
 	"github.com/mmmajder/zms-devops-auth-service/application"
+	"github.com/mmmajder/zms-devops-auth-service/application/external"
 	"github.com/mmmajder/zms-devops-auth-service/domain"
 	"github.com/mmmajder/zms-devops-auth-service/infrastructure/api"
 	"github.com/mmmajder/zms-devops-auth-service/infrastructure/persistence"
@@ -40,7 +42,8 @@ func (server *Server) setupHandlers() {
 	authHandler := server.initAuthHandler(authService, emailService)
 	authHandler.Init(server.router)
 
-	userService := server.initUserService(authService, keycloakService)
+	bookingClient := external.NewBookingClient(server.getBookingAddress())
+	userService := server.initUserService(authService, keycloakService, bookingClient)
 	userHandler := server.initUserHandler(userService)
 	userHandler.Init(server.router)
 }
@@ -73,10 +76,14 @@ func (server *Server) initVerificationStore(client *mongo.Client) domain.Verific
 	return persistence.NewVerificationMongoDBStore(client)
 }
 
-func (server *Server) initUserService(authService *application.AuthService, keycloakService *application.KeycloakService) *application.UserService {
-	return application.NewUserService(&http.Client{}, authService, keycloakService, server.config.IdentityProviderHost)
+func (server *Server) initUserService(authService *application.AuthService, keycloakService *application.KeycloakService, bookingService booking.BookingServiceClient) *application.UserService {
+	return application.NewUserService(&http.Client{}, authService, keycloakService, server.config.IdentityProviderHost, bookingService)
 }
 
 func (server *Server) initUserHandler(service *application.UserService) *api.UserHandler {
 	return api.NewUserHandler(service)
+}
+
+func (server *Server) getBookingAddress() string {
+	return fmt.Sprintf("%s:%s", server.config.BookingHost, server.config.BookingPort)
 }

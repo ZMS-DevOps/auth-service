@@ -8,6 +8,8 @@ const (
 	SubjectVerifyUser           string = "Activate your profile."
 	EmailHost                   string = "smtp.gmail.com"
 	EmailPort                   int    = 587
+	HostRole                    string = "host"
+	GuestRole                   string = "guest"
 	AppPassword                 string = "itfhpxicunwkabza"
 	AdminUsername               string = "admin@test.com"
 	AdminPassword               string = "test"
@@ -17,5 +19,6 @@ const (
 	LocationHeader              string = "Location"
 	HealthCheckMessage          string = "AUTH SERVICE IS HEALTH"
 	InvalidIDErrorMessage       string = "Invalid user ID"
+	InvalidGroupErrorMessage    string = "Invalid user group"
 	UserNotVerifiedErrorMessage string = "user account is disabled. check email for verification"
 )
