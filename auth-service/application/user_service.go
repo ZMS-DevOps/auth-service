@@ -7,7 +7,6 @@ import (
 	"github.com/mmmajder/zms-devops-auth-service/application/external"
 	"github.com/mmmajder/zms-devops-auth-service/domain"
 	"github.com/mmmajder/zms-devops-auth-service/infrastructure/dto"
-	"log"
 	"net/http"
 )
 
@@ -45,12 +44,10 @@ func (service *UserService) GetUser(authorizationHeader string) (*dto.UserDTO, e
 }
 
 func (service *UserService) GetUserById(authorizationHeader, id string) (*dto.UserDTO, error) {
-	log.Printf("GETTING USER ID: %s", id)
 	responseBody, err := service.KeycloakService.GetKeycloakUserById(authorizationHeader, id)
 	if err != nil {
 		return nil, err
 	}
-	log.Printf("step 2: %s", id)
 
 	keycloakDTO := &dto.GettingKeycloakUserDTO{}
 	if err := json.NewDecoder(responseBody).Decode(keycloakDTO); err != nil {
