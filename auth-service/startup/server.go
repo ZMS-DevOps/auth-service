@@ -3,6 +3,7 @@ package api
 import (
 	"fmt"
 	booking "github.com/ZMS-DevOps/booking-service/proto"
+	"github.com/confluentinc/confluent-kafka-go/v2/kafka"
 	"github.com/gorilla/mux"
 	"github.com/mmmajder/zms-devops-auth-service/application"
 	"github.com/mmmajder/zms-devops-auth-service/application/external"
@@ -27,18 +28,18 @@ func NewServer(config *config.Config) *Server {
 	}
 }
 
-func (server *Server) Start() {
-	server.setupHandlers()
+func (server *Server) Start(producer *kafka.Producer) {
+	server.setupHandlers(producer)
 	log.Fatal(http.ListenAndServe(fmt.Sprintf(":%s", server.config.Port), server.router))
 }
 
-func (server *Server) setupHandlers() {
+func (server *Server) setupHandlers(producer *kafka.Producer) {
 	keycloakService := server.initKeycloakService()
 	emailService := server.initEmailService()
 
 	mongoClient := server.initMongoClient()
 	verificationStore := server.initVerificationStore(mongoClient)
-	authService := server.initAuthService(verificationStore, keycloakService)
+	authService := server.initAuthService(verificationStore, keycloakService, producer)
 	authHandler := server.initAuthHandler(authService, emailService)
 	authHandler.Init(server.router)
 
@@ -56,8 +57,8 @@ func (server *Server) initEmailService() *application.EmailService {
 	return application.NewEmailService()
 }
 
-func (server *Server) initAuthService(store domain.VerificationStore, keycloakService *application.KeycloakService) *application.AuthService {
-	return application.NewAuthService(store, &http.Client{}, keycloakService)
+func (server *Server) initAuthService(store domain.VerificationStore, keycloakService *application.KeycloakService, producer *kafka.Producer) *application.AuthService {
+	return application.NewAuthService(store, &http.Client{}, keycloakService, producer)
 }
 
 func (server *Server) initAuthHandler(authService *application.AuthService, emailService *application.EmailService) *api.AuthHandler {

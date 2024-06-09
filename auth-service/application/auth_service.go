@@ -3,9 +3,11 @@ package application
 import (
 	"encoding/json"
 	"errors"
+	"github.com/confluentinc/confluent-kafka-go/v2/kafka"
 	"github.com/mmmajder/zms-devops-auth-service/domain"
 	"github.com/mmmajder/zms-devops-auth-service/infrastructure/dto"
 	"go.mongodb.org/mongo-driver/bson/primitive"
+	"log"
 	"math/rand"
 	"net/http"
 	"time"
@@ -15,13 +17,15 @@ type AuthService struct {
 	store           domain.VerificationStore
 	HttpClient      *http.Client
 	KeycloakService *KeycloakService
+	producer        *kafka.Producer
 }
 
-func NewAuthService(store domain.VerificationStore, httpClient *http.Client, keycloakService *KeycloakService) *AuthService {
+func NewAuthService(store domain.VerificationStore, httpClient *http.Client, keycloakService *KeycloakService, producer *kafka.Producer) *AuthService {
 	return &AuthService{
 		store:           store,
 		HttpClient:      httpClient,
 		KeycloakService: keycloakService,
+		producer:        producer,
 	}
 }
 
@@ -58,6 +62,8 @@ func (service *AuthService) SignUp(email, firstName, lastName, password, address
 	if err != nil {
 		return domain.Verification{}, err
 	}
+
+	service.produceOnUserCreatedNotification(userId, group)
 
 	return *verification, nil
 }
@@ -178,4 +184,24 @@ func (service *AuthService) saveVerification(userId string, firstName string, la
 	insertedVerificationDto.UserId = userId
 
 	return verification, nil
+}
+
+func (service *AuthService) produceOnUserCreatedNotification(userId string, role string) {
+	var topic = "user.created"
+
+	notificationDTO := dto.UserCreatedNotificationDTO{
+		UserId: userId,
+		Role:   role,
+	}
+	message, _ := json.Marshal(notificationDTO)
+	err := service.producer.Produce(&kafka.Message{
+		TopicPartition: kafka.TopicPartition{Topic: &topic, Partition: kafka.PartitionAny},
+		Value:          message,
+	}, nil)
+
+	if err != nil {
+		log.Fatalf("Failed to produce message: %s", err)
+	}
+
+	service.producer.Flush(4 * 1000)
 }
