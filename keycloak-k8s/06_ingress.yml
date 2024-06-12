@@ -11,11 +11,7 @@ spec:
   http:
     - match:
         - uri:
-            prefix: "/realms"
-        - uri:
-            prefix: "/admin"
-        - uri:
-            prefix: "/health"
+            prefix: "/*"
       route:
         - destination:
             host: keycloak.backend.svc.cluster.local
