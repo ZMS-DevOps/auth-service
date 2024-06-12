@@ -7,6 +7,7 @@ import (
 	"github.com/mmmajder/zms-devops-auth-service/application/external"
 	"github.com/mmmajder/zms-devops-auth-service/domain"
 	"github.com/mmmajder/zms-devops-auth-service/infrastructure/dto"
+	"log"
 	"net/http"
 )
 
@@ -34,6 +35,9 @@ func (service *UserService) GetUser(authorizationHeader string) (*dto.UserDTO, e
 	if err != nil {
 		return nil, err
 	}
+
+	responseBodyBytes, _ := json.Marshal(responseBody) // Convert responseBody to []byte
+	log.Printf("Response Body: %s", responseBodyBytes)
 
 	userDTO := &dto.UserDTO{}
 	if err := json.NewDecoder(responseBody).Decode(userDTO); err != nil {
