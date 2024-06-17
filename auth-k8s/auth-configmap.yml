@@ -9,4 +9,4 @@ data:
   BOOKING_HOST: "booking"
   BOOKING_PORT: "8001"
   KAFKA_BOOTSTRAP_SERVERS: "my-kafka.backend.svc.cluster.local:9092"
-  KAFKA_AUTH_PASSWORD: "6DUnElt7GW"
+  KAFKA_AUTH_PASSWORD: "bMNfTWUSS3"

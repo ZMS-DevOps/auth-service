@@ -85,7 +85,11 @@ func (handler *UserHandler) DeleteUser(w http.ResponseWriter, r *http.Request) {
 
 	err := handler.service.DeleteUser(r.Header.Get(domain.Authorization), id, group)
 	if err != nil {
-		handleError(w, http.StatusInternalServerError, err.Error())
+		if err.Error() == domain.UserCouldNotBeDeletedErrorMessage {
+			handleError(w, http.StatusPreconditionFailed, err.Error())
+		} else {
+			handleError(w, http.StatusInternalServerError, err.Error())
+		}
 		return
 	}
 }
