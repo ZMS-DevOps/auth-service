@@ -108,53 +108,20 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
- 
-      - name: Setup Go
-        uses: actions/setup-go@v5
-        with:
-         go-version-file: 'auth-service/go.mod'
-         check-latest: true
-         cache-dependency-path: |
-           auth-service/go.mod
-
-      - name: Clear Go modules cache directory
-        run: sudo rm -rf ~/go/pkg/mod
-
-      - name: Cache go modules
-        uses: actions/cache@v4
-        with:
-         path: |
-           ~/.cache/go-build
-           ~/go/pkg/mod
-         key: ${{ runner.os }}-go-${{ hashFiles('**/auth-service/go.sum') }}
-         restore-keys: |
-           ${{ runner.os }}-go-
-
-      - name: Log in to Docker Hub
-        uses: docker/login-action@v3
-        with:
-          username: ${{ secrets.DOCKER_USERNAME }}
-          password: ${{ secrets.DOCKER_PASSWORD }}
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Create and use a new builder
-        run: |
-          docker buildx create --name mybuilder --use
-          docker buildx inspect mybuilder --bootstrap
-
-      - name: Build and push Docker image
-        id: push
-        uses: docker/build-push-action@v5
+      - name: Build and push Docker image with Kaniko
+        uses: aevea/action-kaniko@master
         with:
-          context: ./auth-service
-          file: ./auth-service/Dockerfile
-          platforms: linux/amd64,linux/arm64
-          push: true
-          tags: |
-            ${{ secrets.DOCKER_USERNAME }}/${{secrets.DOCKER_IMAGE_NAME}}:${{needs.semantic-versioning.outputs.image-tag}}
-            ${{ secrets.DOCKER_USERNAME }}/${{secrets.DOCKER_IMAGE_NAME}}:latest
+          image: ${{ secrets.DOCKER_USERNAME }}/${{ secrets.DOCKER_IMAGE_NAME }}
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+          tag: ${{needs.semantic-versioning.outputs.image-tag}}
+          tag_with_latest: true
+          path: ./auth-service
+          build_file: Dockerfile
+          cache: true
+          extra_args: |
+            --custom-platform=linux/arm64
