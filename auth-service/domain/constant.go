@@ -22,4 +22,5 @@ const (
 	InvalidIDErrorMessage       string = "Invalid user ID"
 	InvalidGroupErrorMessage    string = "Invalid user group"
 	UserNotVerifiedErrorMessage string = "user account is disabled. check email for verification"
+	UserCouldNotBeDeletedErrorMessage string = "user couldn't be deleted"
 )
