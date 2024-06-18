@@ -22,4 +22,3 @@ spec:
       when:
         - key: request.auth.claims[realm_access][roles]
           values: [ "host", "guest"]
-

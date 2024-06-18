@@ -23,8 +23,8 @@ type KeycloakDTO struct {
 
 func NewKeycloakDTO(email, firstName, lastName, password, address, group string) *KeycloakDTO {
 	return &KeycloakDTO{
-		Username:      email,
 		Email:         email,
+		Username:      email,
 		FirstName:     firstName,
 		LastName:      lastName,
 		Enabled:       true,
