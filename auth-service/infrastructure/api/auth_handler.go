@@ -2,23 +2,30 @@ package api
 
 import (
 	"encoding/json"
+	"github.com/afiskon/promtail-client/promtail"
 	"github.com/gorilla/mux"
 	"github.com/mmmajder/zms-devops-auth-service/application"
 	"github.com/mmmajder/zms-devops-auth-service/domain"
 	"github.com/mmmajder/zms-devops-auth-service/infrastructure/dto"
 	"github.com/mmmajder/zms-devops-auth-service/infrastructure/request"
+	"github.com/mmmajder/zms-devops-auth-service/util"
+	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	"net/http"
 )
 
 type AuthHandler struct {
-	authService  *application.AuthService
-	emailService *application.EmailService
+	authService   *application.AuthService
+	emailService  *application.EmailService
+	traceProvider *sdktrace.TracerProvider
+	loki          promtail.Client
 }
 
-func NewAuthHandler(authService *application.AuthService, emailService *application.EmailService) *AuthHandler {
+func NewAuthHandler(authService *application.AuthService, emailService *application.EmailService, traceProvider *sdktrace.TracerProvider, loki promtail.Client) *AuthHandler {
 	return &AuthHandler{
-		authService:  authService,
-		emailService: emailService,
+		authService:   authService,
+		emailService:  emailService,
+		traceProvider: traceProvider,
+		loki:          loki,
 	}
 }
 
@@ -31,20 +38,26 @@ func (handler *AuthHandler) Init(router *mux.Router) {
 }
 
 func (handler *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
+	_, span := handler.traceProvider.Tracer(domain.ServiceName).Start(r.Context(), "login-post")
+	defer func() { span.End() }()
+
 	var loginRequest request.LoginRequest
 	if err := json.NewDecoder(r.Body).Decode(&loginRequest); err != nil {
-		handleError(w, http.StatusBadRequest, "Invalid login payload")
+		util.HttpTraceError(err, "Cannot decode login payload", span, handler.loki, "Login", "")
+		handleError(w, http.StatusBadRequest, "Cannot decode login payload")
 		return
 	}
 
 	if err := loginRequest.AreValidRequestData(); err != nil {
+		util.HttpTraceError(err, "Invalid login payload", span, handler.loki, "Login", "")
 		handleError(w, http.StatusBadRequest, err.Error())
 		return
 	}
 
-	res, err := handler.authService.Login(loginRequest.Email, loginRequest.Password)
+	res, err := handler.authService.Login(loginRequest.Email, loginRequest.Password, span)
 
 	if err != nil {
+		util.HttpTraceError(err, err.Error(), span, handler.loki, "Login", "")
 		handleError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
@@ -53,17 +66,20 @@ func (handler *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 }
 
 func (handler *AuthHandler) SignUp(w http.ResponseWriter, r *http.Request) {
+	_, span := handler.traceProvider.Tracer(domain.ServiceName).Start(r.Context(), "signup-post")
+	defer func() { span.End() }()
 	var registrationRequest request.RegistrationRequest
 	if err := json.NewDecoder(r.Body).Decode(&registrationRequest); err != nil {
-		handleError(w, http.StatusBadRequest, "Invalid registration payload")
+		util.HttpTraceError(err, "Cannot decode registration payload", span, handler.loki, "SignUp", "")
+		handleError(w, http.StatusBadRequest, "Cannot decode registration payload")
 		return
 	}
 
 	if err := registrationRequest.AreValidRequestData(); err != nil {
+		util.HttpTraceError(err, "Invalid registration payload", span, handler.loki, "SignUp", "")
 		handleError(w, http.StatusBadRequest, err.Error())
 		return
 	}
-
 	verification, err := handler.authService.SignUp(
 		registrationRequest.Email,
 		registrationRequest.FirstName,
@@ -71,13 +87,16 @@ func (handler *AuthHandler) SignUp(w http.ResponseWriter, r *http.Request) {
 		registrationRequest.Password,
 		registrationRequest.Address,
 		registrationRequest.Group,
+		span,
 	)
 
 	if err != nil {
+		util.HttpTraceError(err, err.Error(), span, handler.loki, "SignUp", "")
 		handleError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
 
+	span.AddEvent("Establishing connection to the email service...")
 	handler.emailService.SendEmail(domain.SubjectVerifyUser, handler.emailService.GetVerificationCodeEmailBody(registrationRequest.Email, verification))
 
 	writeResponse(w, http.StatusCreated, dto.VerificationDTO{Id: verification.Id.Hex(), UserId: verification.UserId})

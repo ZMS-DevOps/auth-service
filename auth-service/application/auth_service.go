@@ -3,10 +3,13 @@ package application
 import (
 	"encoding/json"
 	"errors"
+	"github.com/afiskon/promtail-client/promtail"
 	"github.com/confluentinc/confluent-kafka-go/v2/kafka"
 	"github.com/mmmajder/zms-devops-auth-service/domain"
 	"github.com/mmmajder/zms-devops-auth-service/infrastructure/dto"
+	"github.com/mmmajder/zms-devops-auth-service/util"
 	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.opentelemetry.io/otel/trace"
 	"log"
 	"math/rand"
 	"net/http"
@@ -18,18 +21,21 @@ type AuthService struct {
 	HttpClient      *http.Client
 	KeycloakService *KeycloakService
 	producer        *kafka.Producer
+	loki            promtail.Client
 }
 
-func NewAuthService(store domain.VerificationStore, httpClient *http.Client, keycloakService *KeycloakService, producer *kafka.Producer) *AuthService {
+func NewAuthService(store domain.VerificationStore, httpClient *http.Client, keycloakService *KeycloakService, producer *kafka.Producer, loki promtail.Client) *AuthService {
 	return &AuthService{
 		store:           store,
 		HttpClient:      httpClient,
 		KeycloakService: keycloakService,
 		producer:        producer,
+		loki:            loki,
 	}
 }
 
-func (service *AuthService) Login(email string, password string) (*dto.LoginDTO, error) {
+func (service *AuthService) Login(email string, password string, span trace.Span) (*dto.LoginDTO, error) {
+	span.AddEvent("Establishing connection to the keycloak for logging in...")
 	responseBody, err := service.KeycloakService.LoginKeycloakUser(email, password)
 	if err != nil {
 		return nil, err
@@ -37,33 +43,39 @@ func (service *AuthService) Login(email string, password string) (*dto.LoginDTO,
 
 	loginDTO := &dto.LoginDTO{}
 	if err := json.NewDecoder(responseBody).Decode(loginDTO); err != nil {
+		util.HttpTraceError(err, "can't decode login payload", span, service.loki, "Login", "")
 		return nil, errors.New("can't decode login payload")
 	}
 	if !service.userIsEnabled(loginDTO) {
+		util.HttpTraceError(err, domain.UserNotVerifiedErrorMessage, span, service.loki, "Login", "")
 		return nil, errors.New(domain.UserNotVerifiedErrorMessage)
 	}
 	return loginDTO, nil
 }
 
-func (service *AuthService) SignUp(email, firstName, lastName, password, address, group string) (domain.Verification, error) {
+func (service *AuthService) SignUp(email, firstName, lastName, password, address, group string, span trace.Span) (domain.Verification, error) {
 	requestBody := dto.NewKeycloakDTO(email, firstName, lastName, password, address, group)
 
 	loginDTO, err := service.getAdminLoginDTO()
 	if err != nil {
+		util.HttpTraceError(err, "cannot log as keycloak admin", span, service.loki, "Login", "")
 		return domain.Verification{}, err
 	}
 
+	span.AddEvent("Establishing connection to the keycloak for signing up...")
 	userId, err := service.KeycloakService.CreateKeycloakUser(requestBody, domain.BearerSchema+loginDTO.AccessToken)
 	if err != nil {
+		util.HttpTraceError(err, "cannot create user", span, service.loki, "Login", "")
 		return domain.Verification{}, err
 	}
 
 	verification, err := service.saveVerification(userId, firstName, lastName, address)
 	if err != nil {
+		util.HttpTraceError(err, "cannot save verification code", span, service.loki, "Login", "")
 		return domain.Verification{}, err
 	}
 
-	service.produceOnUserCreatedNotification(userId, group)
+	service.produceOnUserCreatedNotification(userId, group, span)
 
 	return *verification, nil
 }
@@ -186,9 +198,9 @@ func (service *AuthService) saveVerification(userId string, firstName string, la
 	return verification, nil
 }
 
-func (service *AuthService) produceOnUserCreatedNotification(userId string, role string) {
+func (service *AuthService) produceOnUserCreatedNotification(userId string, role string, span trace.Span) {
 	var topic = "user.created"
-
+	span.AddEvent("Producing notification to subscribed clients")
 	notificationDTO := dto.UserCreatedNotificationDTO{
 		UserId: userId,
 		Role:   role,
