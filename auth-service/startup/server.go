@@ -3,6 +3,7 @@ package api
 import (
 	"fmt"
 	booking "github.com/ZMS-DevOps/booking-service/proto"
+	"github.com/afiskon/promtail-client/promtail"
 	"github.com/confluentinc/confluent-kafka-go/v2/kafka"
 	"github.com/gorilla/mux"
 	"github.com/mmmajder/zms-devops-auth-service/application"
@@ -12,19 +13,24 @@ import (
 	"github.com/mmmajder/zms-devops-auth-service/infrastructure/persistence"
 	"github.com/mmmajder/zms-devops-auth-service/startup/config"
 	"go.mongodb.org/mongo-driver/mongo"
+	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	"log"
 	"net/http"
 )
 
 type Server struct {
-	config *config.Config
-	router *mux.Router
+	config        *config.Config
+	router        *mux.Router
+	traceProvider *sdktrace.TracerProvider
+	loki          promtail.Client
 }
 
-func NewServer(config *config.Config) *Server {
+func NewServer(config *config.Config, traceProvider *sdktrace.TracerProvider, loki promtail.Client) *Server {
 	return &Server{
-		config: config,
-		router: mux.NewRouter(),
+		config:        config,
+		router:        mux.NewRouter(),
+		traceProvider: traceProvider,
+		loki:          loki,
 	}
 }
 
@@ -58,11 +64,11 @@ func (server *Server) initEmailService() *application.EmailService {
 }
 
 func (server *Server) initAuthService(store domain.VerificationStore, keycloakService *application.KeycloakService, producer *kafka.Producer) *application.AuthService {
-	return application.NewAuthService(store, &http.Client{}, keycloakService, producer)
+	return application.NewAuthService(store, &http.Client{}, keycloakService, producer, server.loki)
 }
 
 func (server *Server) initAuthHandler(authService *application.AuthService, emailService *application.EmailService) *api.AuthHandler {
-	return api.NewAuthHandler(authService, emailService)
+	return api.NewAuthHandler(authService, emailService, server.traceProvider, server.loki)
 }
 
 func (server *Server) initMongoClient() *mongo.Client {

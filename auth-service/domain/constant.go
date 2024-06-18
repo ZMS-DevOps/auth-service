@@ -1,6 +1,7 @@
 package domain
 
 const (
+	ServiceName                 string = "auth-service"
 	AuthContextPath             string = "/auth"
 	UserContextPath             string = "/user"
 	BearerSchema                string = "Bearer "
