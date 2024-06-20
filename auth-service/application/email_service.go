@@ -18,7 +18,7 @@ func NewEmailService() *EmailService {
 }
 
 func (service *EmailService) GetVerificationCodeEmailBody(receiverEmail string, verification domain.Verification, span trace.Span, loki promtail.Client) string {
-	util.HttpTraceInfo("Getting verification code email body...", span, loki, "GetSpecialPrices", "")
+	util.HttpTraceInfo("Getting verification code email body...", span, loki, "GetVerificationCodeEmailBody", "")
 	t, _ := template.New("verification_email").Parse(service.getHtmlTemplate())
 	var body bytes.Buffer
 	if err := service.executeEmail(receiverEmail, verification, t, &body); err != nil {
@@ -29,7 +29,7 @@ func (service *EmailService) GetVerificationCodeEmailBody(receiverEmail string, 
 }
 
 func (service *EmailService) SendEmail(subject, body string, span trace.Span, loki promtail.Client) {
-	util.HttpTraceInfo("Sending email...", span, loki, "GetSpecialPrices", "")
+	util.HttpTraceInfo("Sending email...", span, loki, "SendEmail", "")
 	m := mail.NewMessage()
 	m.SetHeader("From", domain.SenderEmailAddress)
 	m.SetHeader("To", domain.SenderEmailAddress)

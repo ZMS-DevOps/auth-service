@@ -35,7 +35,7 @@ func NewAuthService(store domain.VerificationStore, httpClient *http.Client, key
 }
 
 func (service *AuthService) Login(email string, password string, span trace.Span, loki promtail.Client) (*dto.LoginDTO, error) {
-	util.HttpTraceInfo("Establishing connection to the keycloak for logging in...", span, loki, "GetSpecialPrices", "")
+	util.HttpTraceInfo("Establishing connection to the keycloak for logging in...", span, loki, "Login", "")
 	responseBody, err := service.KeycloakService.LoginKeycloakUser(email, password, span, loki)
 	if err != nil {
 		return nil, err
@@ -54,7 +54,7 @@ func (service *AuthService) Login(email string, password string, span trace.Span
 }
 
 func (service *AuthService) SignUp(email, firstName, lastName, password, address, group string, span trace.Span, loki promtail.Client) (domain.Verification, error) {
-	util.HttpTraceInfo("Signing up...", span, loki, "GetSpecialPrices", "")
+	util.HttpTraceInfo("Signing up...", span, loki, "SignUp", "")
 	requestBody := dto.NewKeycloakDTO(email, firstName, lastName, password, address, group)
 
 	loginDTO, err := service.getAdminLoginDTO(span, loki)
@@ -63,7 +63,7 @@ func (service *AuthService) SignUp(email, firstName, lastName, password, address
 		return domain.Verification{}, err
 	}
 
-	util.HttpTraceInfo("Establishing connection to the keycloak for signing up...", span, loki, "GetSpecialPrices", "")
+	util.HttpTraceInfo("Establishing connection to the keycloak for signing up...", span, loki, "SignUp", "")
 	userId, err := service.KeycloakService.CreateKeycloakUser(requestBody, domain.BearerSchema+loginDTO.AccessToken, span, loki)
 	if err != nil {
 		util.HttpTraceError(err, "cannot create user", span, service.loki, "Login", "")
@@ -82,7 +82,7 @@ func (service *AuthService) SignUp(email, firstName, lastName, password, address
 }
 
 func (service *AuthService) VerifyUser(verificationId primitive.ObjectID, userId string, securityCode int, span trace.Span, loki promtail.Client) error {
-	util.HttpTraceInfo("Verifying user...", span, loki, "GetSpecialPrices", "")
+	util.HttpTraceInfo("Verifying user...", span, loki, "VerifyUser", "")
 	verification, err := service.store.Get(verificationId)
 	if err != nil {
 		return err
@@ -132,7 +132,7 @@ func (service *AuthService) getAdminLoginDTO(span trace.Span, loki promtail.Clie
 }
 
 func (service *AuthService) UpdateVerificationCode(verificationId string, span trace.Span, loki promtail.Client) (domain.Verification, error) {
-	util.HttpTraceInfo("Updating verification code...", span, loki, "GetSpecialPrices", "")
+	util.HttpTraceInfo("Updating verification code...", span, loki, "UpdateVerificationCode", "")
 	verificationPrimitiveObjectId, err := primitive.ObjectIDFromHex(verificationId)
 	if err != nil {
 		return domain.Verification{}, err
@@ -182,7 +182,7 @@ func (service *AuthService) userIsEnabled(loginDTO *dto.LoginDTO, span trace.Spa
 }
 
 func (service *AuthService) saveVerification(userId string, firstName string, lastName string, address string, span trace.Span, loki promtail.Client) (*domain.Verification, error) {
-	util.HttpTraceInfo("Saving verification...", span, loki, "GetSpecialPrices", "")
+	util.HttpTraceInfo("Saving verification...", span, loki, "saveVerification", "")
 	verification := &domain.Verification{
 		UserId:    userId,
 		FirstName: firstName,
@@ -203,9 +203,9 @@ func (service *AuthService) saveVerification(userId string, firstName string, la
 }
 
 func (service *AuthService) produceOnUserCreatedNotification(userId string, role string, span trace.Span, loki promtail.Client) {
-	util.HttpTraceInfo("Producing on user created notification...", span, loki, "GetSpecialPrices", "")
+	util.HttpTraceInfo("Producing on user created notification...", span, loki, "produceOnUserCreatedNotification", "")
 	var topic = "user.created"
-	util.HttpTraceInfo("Producing notification to subscribed clients", span, loki, "GetSpecialPrices", "")
+	util.HttpTraceInfo("Producing notification to subscribed clients", span, loki, "produceOnUserCreatedNotification", "")
 	notificationDTO := dto.UserCreatedNotificationDTO{
 		UserId: userId,
 		Role:   role,

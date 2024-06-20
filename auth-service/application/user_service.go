@@ -33,7 +33,7 @@ func NewUserService(httpClient *http.Client, authService *AuthService, keycloakS
 }
 
 func (service *UserService) GetUser(authorizationHeader string, span trace.Span, loki promtail.Client) (*dto.UserDTO, error) {
-	util.HttpTraceInfo("Getting user...", span, loki, "GetSpecialPrices", "")
+	util.HttpTraceInfo("Getting user...", span, loki, "UpdateVerificationCode", "")
 	responseBody, err := service.KeycloakService.GetKeycloakUser(authorizationHeader, span, loki)
 	if err != nil {
 		return nil, err
@@ -48,7 +48,7 @@ func (service *UserService) GetUser(authorizationHeader string, span trace.Span,
 }
 
 func (service *UserService) GetUserById(authorizationHeader, id string, span trace.Span, loki promtail.Client) (*dto.UserDTO, error) {
-	util.HttpTraceInfo("Getting user by id...", span, loki, "GetSpecialPrices", "")
+	util.HttpTraceInfo("Getting user by id...", span, loki, "GetUserById", "")
 	responseBody, err := service.KeycloakService.GetKeycloakUserById(authorizationHeader, id, span, loki)
 	if err != nil {
 		return nil, err
@@ -69,7 +69,7 @@ func (service *UserService) GetUserById(authorizationHeader, id string, span tra
 }
 
 func (service *UserService) UpdateUser(authorizationHeader, id, firstName, lastName, address string, span trace.Span, loki promtail.Client) error {
-	util.HttpTraceInfo("Updating user...", span, loki, "GetSpecialPrices", "")
+	util.HttpTraceInfo("Updating user...", span, loki, "UpdateUser", "")
 	requestBody := dto.NewUpdateKeycloakUserDTO(id, firstName, lastName, address)
 	if _, err := service.KeycloakService.UpdateKeycloakUser(authorizationHeader, id, requestBody, span, loki); err != nil {
 		return err
@@ -79,7 +79,7 @@ func (service *UserService) UpdateUser(authorizationHeader, id, firstName, lastN
 }
 
 func (service *UserService) DeleteUser(authorizationHeader, id, group string, span trace.Span, loki promtail.Client) error {
-	util.HttpTraceInfo("Deleting user...", span, loki, "GetSpecialPrices", "")
+	util.HttpTraceInfo("Deleting user...", span, loki, "DeleteUser", "")
 	var canDeleteUser bool
 	if group == domain.HostRole {
 		response, err := external.IfHostCanBeDeleted(service.bookingClient, id, span, loki)
@@ -105,7 +105,7 @@ func (service *UserService) DeleteUser(authorizationHeader, id, group string, sp
 }
 
 func (service *UserService) ResetPassword(authorizationHeader, id, password string, span trace.Span, loki promtail.Client) error {
-	util.HttpTraceInfo("Resetting password...", span, loki, "GetSpecialPrices", "")
+	util.HttpTraceInfo("Resetting password...", span, loki, "ResetPassword", "")
 	requestBody := dto.NewCredentialsDTO(password)
 	if err := service.KeycloakService.ResetPasswordOfKeycloakUser(authorizationHeader, id, requestBody, span, loki); err != nil {
 		return err

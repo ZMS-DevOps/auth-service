@@ -30,7 +30,7 @@ func NewKeycloakService(httpClient *http.Client, identityProviderHost string) *K
 }
 
 func (service *KeycloakService) LoginKeycloakUser(email, password string, span trace.Span, loki promtail.Client) (io.ReadCloser, error) {
-	util.HttpTraceInfo("Logging in Keycloak user...", span, loki, "GetSpecialPrices", "")
+	util.HttpTraceInfo("Logging in Keycloak user...", span, loki, "LoginKeycloakUser", "")
 	formData := url.Values{
 		"client_id":  {"Istio"},
 		"username":   {email},
@@ -63,7 +63,7 @@ func (service *KeycloakService) LoginKeycloakUser(email, password string, span t
 }
 
 func (service *KeycloakService) CreateKeycloakUser(signupDTO *dto.KeycloakDTO, authorizationHeader string, span trace.Span, loki promtail.Client) (string, error) {
-	util.HttpTraceInfo("Creating Keycloak user...", span, loki, "GetSpecialPrices", "")
+	util.HttpTraceInfo("Creating Keycloak user...", span, loki, "CreateKeycloakUser", "")
 	jsonBody, err := json.Marshal(signupDTO)
 	if err != nil {
 		return "", err
@@ -95,7 +95,7 @@ func (service *KeycloakService) CreateKeycloakUser(signupDTO *dto.KeycloakDTO, a
 }
 
 func (service *KeycloakService) GetKeycloakUser(authorizationHeader string, span trace.Span, loki promtail.Client) (io.ReadCloser, error) {
-	util.HttpTraceInfo("Getting Keycloak user...", span, loki, "GetSpecialPrices", "")
+	util.HttpTraceInfo("Getting Keycloak user...", span, loki, "GetKeycloakUser", "")
 	req, err := http.NewRequest(
 		http.MethodPost,
 		fmt.Sprintf("%s/protocol/openid-connect/userinfo", service.getDefaultUserConsoleUrl()),
@@ -118,7 +118,7 @@ func (service *KeycloakService) GetKeycloakUser(authorizationHeader string, span
 }
 
 func (service *KeycloakService) GetKeycloakUserById(authorizationHeader, id string, span trace.Span, loki promtail.Client) (io.ReadCloser, error) {
-	util.HttpTraceInfo("Getting Keycloak user by id...", span, loki, "GetSpecialPrices", "")
+	util.HttpTraceInfo("Getting Keycloak user by id...", span, loki, "GetKeycloakUserById", "")
 	req, err := http.NewRequest(
 		http.MethodGet,
 		fmt.Sprintf("%s/%s?q=address", service.getDefaultAdminConsoleUrl(), id),
@@ -142,7 +142,7 @@ func (service *KeycloakService) GetKeycloakUserById(authorizationHeader, id stri
 }
 
 func (service *KeycloakService) UpdateKeycloakUser(authorizationHeader string, id string, updateUser *dto.UpdateKeycloakUserDTO, span trace.Span, loki promtail.Client) (io.ReadCloser, error) {
-	util.HttpTraceInfo("Updating Keycloak user...", span, loki, "GetSpecialPrices", "")
+	util.HttpTraceInfo("Updating Keycloak user...", span, loki, "UpdateKeycloakUser", "")
 	jsonBody, err := json.Marshal(updateUser)
 	if err != nil {
 		return nil, err
@@ -171,7 +171,7 @@ func (service *KeycloakService) UpdateKeycloakUser(authorizationHeader string, i
 }
 
 func (service *KeycloakService) DeleteKeycloakUser(authorizationHeader, id string, span trace.Span, loki promtail.Client) error {
-	util.HttpTraceInfo("Deleting Keycloak user...", span, loki, "GetSpecialPrices", "")
+	util.HttpTraceInfo("Deleting Keycloak user...", span, loki, "DeleteKeycloakUser", "")
 	req, err := http.NewRequest(
 		http.MethodDelete,
 		fmt.Sprintf("%s/%s", service.getDefaultAdminConsoleUrl(), id),
@@ -194,7 +194,7 @@ func (service *KeycloakService) DeleteKeycloakUser(authorizationHeader, id strin
 }
 
 func (service *KeycloakService) ResetPasswordOfKeycloakUser(authorizationHeader string, id string, requestBody *dto.CredentialsDTO, span trace.Span, loki promtail.Client) error {
-	util.HttpTraceInfo("Resetting Keycloak user password...", span, loki, "GetSpecialPrices", "")
+	util.HttpTraceInfo("Resetting Keycloak user password...", span, loki, "ResetPasswordOfKeycloakUser", "")
 	jsonBody, err := json.Marshal(requestBody)
 	if err != nil {
 		return err
@@ -223,7 +223,7 @@ func (service *KeycloakService) ResetPasswordOfKeycloakUser(authorizationHeader 
 }
 
 func (service *KeycloakService) getUserIdFromLocation(resp *http.Response, span trace.Span, loki promtail.Client) (string, error) {
-	util.HttpTraceInfo("Getting user id from location...", span, loki, "GetSpecialPrices", "")
+	util.HttpTraceInfo("Getting user id from location...", span, loki, "getUserIdFromLocation", "")
 	if location := resp.Header.Get(domain.LocationHeader); location != "" {
 		parts := strings.Split(location, "/")
 		if value := service.checkIfFieldHasValue(parts, span, loki); value != "" {
@@ -235,7 +235,7 @@ func (service *KeycloakService) getUserIdFromLocation(resp *http.Response, span 
 }
 
 func (service *KeycloakService) checkIfFieldHasValue(parts []string, span trace.Span, loki promtail.Client) string {
-	util.HttpTraceInfo("Checking if field has value...", span, loki, "GetSpecialPrices", "")
+	util.HttpTraceInfo("Checking if field has value...", span, loki, "checkIfFieldHasValue", "")
 	if len(parts) > 0 {
 		lastPart := parts[len(parts)-1]
 		return lastPart

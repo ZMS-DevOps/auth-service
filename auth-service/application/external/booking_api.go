@@ -24,7 +24,7 @@ func getConnection(address string) (*grpc.ClientConn, error) {
 }
 
 func IfHostCanBeDeleted(bookingClient booking.BookingServiceClient, id string, span trace.Span, loki promtail.Client) (*booking.CheckDeleteHostResponse, error) {
-	util.HttpTraceInfo("Checking if host can be deleted in booking service...", span, loki, "GetSpecialPrices", "")
+	util.HttpTraceInfo("Checking if host can be deleted in booking service...", span, loki, "IfHostCanBeDeleted", "")
 	return bookingClient.CheckDeleteHost(
 		context.TODO(),
 		&booking.CheckDeleteHostRequest{
@@ -33,7 +33,7 @@ func IfHostCanBeDeleted(bookingClient booking.BookingServiceClient, id string, s
 }
 
 func IfGuestCanBeDeleted(bookingClient booking.BookingServiceClient, id string, span trace.Span, loki promtail.Client) (*booking.CheckDeleteClientResponse, error) {
-	util.HttpTraceInfo("Checking if guest can be deleted in booking service...", span, loki, "GetSpecialPrices", "")
+	util.HttpTraceInfo("Checking if guest can be deleted in booking service...", span, loki, "IfGuestCanBeDeleted", "")
 	return bookingClient.CheckDeleteClient(
 		context.TODO(),
 		&booking.CheckDeleteClientRequest{
