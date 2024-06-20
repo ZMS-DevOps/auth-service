@@ -34,9 +34,9 @@ func NewAuthService(store domain.VerificationStore, httpClient *http.Client, key
 	}
 }
 
-func (service *AuthService) Login(email string, password string, span trace.Span) (*dto.LoginDTO, error) {
-	span.AddEvent("Establishing connection to the keycloak for logging in...")
-	responseBody, err := service.KeycloakService.LoginKeycloakUser(email, password)
+func (service *AuthService) Login(email string, password string, span trace.Span, loki promtail.Client) (*dto.LoginDTO, error) {
+	util.HttpTraceInfo("Establishing connection to the keycloak for logging in...", span, loki, "Login", "")
+	responseBody, err := service.KeycloakService.LoginKeycloakUser(email, password, span, loki)
 	if err != nil {
 		return nil, err
 	}
@@ -46,41 +46,43 @@ func (service *AuthService) Login(email string, password string, span trace.Span
 		util.HttpTraceError(err, "can't decode login payload", span, service.loki, "Login", "")
 		return nil, errors.New("can't decode login payload")
 	}
-	if !service.userIsEnabled(loginDTO) {
+	if !service.userIsEnabled(loginDTO, span, loki) {
 		util.HttpTraceError(err, domain.UserNotVerifiedErrorMessage, span, service.loki, "Login", "")
 		return nil, errors.New(domain.UserNotVerifiedErrorMessage)
 	}
 	return loginDTO, nil
 }
 
-func (service *AuthService) SignUp(email, firstName, lastName, password, address, group string, span trace.Span) (domain.Verification, error) {
+func (service *AuthService) SignUp(email, firstName, lastName, password, address, group string, span trace.Span, loki promtail.Client) (domain.Verification, error) {
+	util.HttpTraceInfo("Signing up...", span, loki, "SignUp", "")
 	requestBody := dto.NewKeycloakDTO(email, firstName, lastName, password, address, group)
 
-	loginDTO, err := service.getAdminLoginDTO()
+	loginDTO, err := service.getAdminLoginDTO(span, loki)
 	if err != nil {
 		util.HttpTraceError(err, "cannot log as keycloak admin", span, service.loki, "Login", "")
 		return domain.Verification{}, err
 	}
 
-	span.AddEvent("Establishing connection to the keycloak for signing up...")
-	userId, err := service.KeycloakService.CreateKeycloakUser(requestBody, domain.BearerSchema+loginDTO.AccessToken)
+	util.HttpTraceInfo("Establishing connection to the keycloak for signing up...", span, loki, "SignUp", "")
+	userId, err := service.KeycloakService.CreateKeycloakUser(requestBody, domain.BearerSchema+loginDTO.AccessToken, span, loki)
 	if err != nil {
 		util.HttpTraceError(err, "cannot create user", span, service.loki, "Login", "")
 		return domain.Verification{}, err
 	}
 
-	verification, err := service.saveVerification(userId, firstName, lastName, address)
+	verification, err := service.saveVerification(userId, firstName, lastName, address, span, loki)
 	if err != nil {
 		util.HttpTraceError(err, "cannot save verification code", span, service.loki, "Login", "")
 		return domain.Verification{}, err
 	}
 
-	service.produceOnUserCreatedNotification(userId, group, span)
+	service.produceOnUserCreatedNotification(userId, group, span, loki)
 
 	return *verification, nil
 }
 
-func (service *AuthService) VerifyUser(verificationId primitive.ObjectID, userId string, securityCode int) error {
+func (service *AuthService) VerifyUser(verificationId primitive.ObjectID, userId string, securityCode int, span trace.Span, loki promtail.Client) error {
+	util.HttpTraceInfo("Verifying user...", span, loki, "VerifyUser", "")
 	verification, err := service.store.Get(verificationId)
 	if err != nil {
 		return err
@@ -90,12 +92,12 @@ func (service *AuthService) VerifyUser(verificationId primitive.ObjectID, userId
 		return err
 	}
 
-	loginDTO, err := service.getAdminLoginDTO()
+	loginDTO, err := service.getAdminLoginDTO(span, loki)
 	if err != nil {
 		return err
 	}
 
-	if _, err := service.KeycloakService.UpdateKeycloakUser(domain.BearerSchema+loginDTO.AccessToken, userId, dto.NewUpdateKeycloakUserDTO(userId, verification.FirstName, verification.LastName, verification.Address)); err != nil {
+	if _, err := service.KeycloakService.UpdateKeycloakUser(domain.BearerSchema+loginDTO.AccessToken, userId, dto.NewUpdateKeycloakUserDTO(userId, verification.FirstName, verification.LastName, verification.Address), span, loki); err != nil {
 		return err
 	}
 
@@ -115,8 +117,8 @@ func (service *AuthService) canVerifyUser(verification *domain.Verification, use
 	return true, nil
 }
 
-func (service *AuthService) getAdminLoginDTO() (*dto.LoginDTO, error) {
-	responseBody, err := service.KeycloakService.LoginKeycloakUser(domain.AdminUsername, domain.AdminPassword)
+func (service *AuthService) getAdminLoginDTO(span trace.Span, loki promtail.Client) (*dto.LoginDTO, error) {
+	responseBody, err := service.KeycloakService.LoginKeycloakUser(domain.AdminUsername, domain.AdminPassword, span, loki)
 	if err != nil {
 		return nil, err
 	}
@@ -129,7 +131,8 @@ func (service *AuthService) getAdminLoginDTO() (*dto.LoginDTO, error) {
 	return loginDTO, nil
 }
 
-func (service *AuthService) UpdateVerificationCode(verificationId string) (domain.Verification, error) {
+func (service *AuthService) UpdateVerificationCode(verificationId string, span trace.Span, loki promtail.Client) (domain.Verification, error) {
+	util.HttpTraceInfo("Updating verification code...", span, loki, "UpdateVerificationCode", "")
 	verificationPrimitiveObjectId, err := primitive.ObjectIDFromHex(verificationId)
 	if err != nil {
 		return domain.Verification{}, err
@@ -162,8 +165,8 @@ func (service *AuthService) generateRandomVerificationCode() int {
 	return rng.Intn(maxNumber-minNumber+1) + minNumber
 }
 
-func (service *AuthService) userIsEnabled(loginDTO *dto.LoginDTO) bool {
-	responseBody, err := service.KeycloakService.GetKeycloakUser(domain.BearerSchema + loginDTO.AccessToken)
+func (service *AuthService) userIsEnabled(loginDTO *dto.LoginDTO, span trace.Span, loki promtail.Client) bool {
+	responseBody, err := service.KeycloakService.GetKeycloakUser(domain.BearerSchema+loginDTO.AccessToken, span, loki)
 	if err != nil {
 		return false
 	}
@@ -178,7 +181,8 @@ func (service *AuthService) userIsEnabled(loginDTO *dto.LoginDTO) bool {
 	return true
 }
 
-func (service *AuthService) saveVerification(userId string, firstName string, lastName string, address string) (*domain.Verification, error) {
+func (service *AuthService) saveVerification(userId string, firstName string, lastName string, address string, span trace.Span, loki promtail.Client) (*domain.Verification, error) {
+	util.HttpTraceInfo("Saving verification...", span, loki, "saveVerification", "")
 	verification := &domain.Verification{
 		UserId:    userId,
 		FirstName: firstName,
@@ -198,9 +202,10 @@ func (service *AuthService) saveVerification(userId string, firstName string, la
 	return verification, nil
 }
 
-func (service *AuthService) produceOnUserCreatedNotification(userId string, role string, span trace.Span) {
+func (service *AuthService) produceOnUserCreatedNotification(userId string, role string, span trace.Span, loki promtail.Client) {
+	util.HttpTraceInfo("Producing on user created notification...", span, loki, "produceOnUserCreatedNotification", "")
 	var topic = "user.created"
-	span.AddEvent("Producing notification to subscribed clients")
+	util.HttpTraceInfo("Producing notification to subscribed clients", span, loki, "produceOnUserCreatedNotification", "")
 	notificationDTO := dto.UserCreatedNotificationDTO{
 		UserId: userId,
 		Role:   role,

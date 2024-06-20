@@ -5,8 +5,11 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/afiskon/promtail-client/promtail"
 	"github.com/mmmajder/zms-devops-auth-service/domain"
 	"github.com/mmmajder/zms-devops-auth-service/infrastructure/dto"
+	"github.com/mmmajder/zms-devops-auth-service/util"
+	"go.opentelemetry.io/otel/trace"
 	"io"
 	"net/http"
 	"net/url"
@@ -26,7 +29,8 @@ func NewKeycloakService(httpClient *http.Client, identityProviderHost string) *K
 	}
 }
 
-func (service *KeycloakService) LoginKeycloakUser(email, password string) (io.ReadCloser, error) {
+func (service *KeycloakService) LoginKeycloakUser(email, password string, span trace.Span, loki promtail.Client) (io.ReadCloser, error) {
+	util.HttpTraceInfo("Logging in Keycloak user...", span, loki, "LoginKeycloakUser", "")
 	formData := url.Values{
 		"client_id":  {"Istio"},
 		"username":   {email},
@@ -58,7 +62,8 @@ func (service *KeycloakService) LoginKeycloakUser(email, password string) (io.Re
 	return resp.Body, nil
 }
 
-func (service *KeycloakService) CreateKeycloakUser(signupDTO *dto.KeycloakDTO, authorizationHeader string) (string, error) {
+func (service *KeycloakService) CreateKeycloakUser(signupDTO *dto.KeycloakDTO, authorizationHeader string, span trace.Span, loki promtail.Client) (string, error) {
+	util.HttpTraceInfo("Creating Keycloak user...", span, loki, "CreateKeycloakUser", "")
 	jsonBody, err := json.Marshal(signupDTO)
 	if err != nil {
 		return "", err
@@ -86,10 +91,11 @@ func (service *KeycloakService) CreateKeycloakUser(signupDTO *dto.KeycloakDTO, a
 		return "", errors.New("registration failed")
 	}
 
-	return service.getUserIdFromLocation(resp)
+	return service.getUserIdFromLocation(resp, span, loki)
 }
 
-func (service *KeycloakService) GetKeycloakUser(authorizationHeader string) (io.ReadCloser, error) {
+func (service *KeycloakService) GetKeycloakUser(authorizationHeader string, span trace.Span, loki promtail.Client) (io.ReadCloser, error) {
+	util.HttpTraceInfo("Getting Keycloak user...", span, loki, "GetKeycloakUser", "")
 	req, err := http.NewRequest(
 		http.MethodPost,
 		fmt.Sprintf("%s/protocol/openid-connect/userinfo", service.getDefaultUserConsoleUrl()),
@@ -111,7 +117,8 @@ func (service *KeycloakService) GetKeycloakUser(authorizationHeader string) (io.
 	return resp.Body, nil
 }
 
-func (service *KeycloakService) GetKeycloakUserById(authorizationHeader, id string) (io.ReadCloser, error) {
+func (service *KeycloakService) GetKeycloakUserById(authorizationHeader, id string, span trace.Span, loki promtail.Client) (io.ReadCloser, error) {
+	util.HttpTraceInfo("Getting Keycloak user by id...", span, loki, "GetKeycloakUserById", "")
 	req, err := http.NewRequest(
 		http.MethodGet,
 		fmt.Sprintf("%s/%s?q=address", service.getDefaultAdminConsoleUrl(), id),
@@ -134,7 +141,8 @@ func (service *KeycloakService) GetKeycloakUserById(authorizationHeader, id stri
 	return resp.Body, nil
 }
 
-func (service *KeycloakService) UpdateKeycloakUser(authorizationHeader string, id string, updateUser *dto.UpdateKeycloakUserDTO) (io.ReadCloser, error) {
+func (service *KeycloakService) UpdateKeycloakUser(authorizationHeader string, id string, updateUser *dto.UpdateKeycloakUserDTO, span trace.Span, loki promtail.Client) (io.ReadCloser, error) {
+	util.HttpTraceInfo("Updating Keycloak user...", span, loki, "UpdateKeycloakUser", "")
 	jsonBody, err := json.Marshal(updateUser)
 	if err != nil {
 		return nil, err
@@ -162,7 +170,8 @@ func (service *KeycloakService) UpdateKeycloakUser(authorizationHeader string, i
 	return resp.Body, nil
 }
 
-func (service *KeycloakService) DeleteKeycloakUser(authorizationHeader, id string) error {
+func (service *KeycloakService) DeleteKeycloakUser(authorizationHeader, id string, span trace.Span, loki promtail.Client) error {
+	util.HttpTraceInfo("Deleting Keycloak user...", span, loki, "DeleteKeycloakUser", "")
 	req, err := http.NewRequest(
 		http.MethodDelete,
 		fmt.Sprintf("%s/%s", service.getDefaultAdminConsoleUrl(), id),
@@ -184,7 +193,8 @@ func (service *KeycloakService) DeleteKeycloakUser(authorizationHeader, id strin
 	return nil
 }
 
-func (service *KeycloakService) ResetPasswordOfKeycloakUser(authorizationHeader string, id string, requestBody *dto.CredentialsDTO) error {
+func (service *KeycloakService) ResetPasswordOfKeycloakUser(authorizationHeader string, id string, requestBody *dto.CredentialsDTO, span trace.Span, loki promtail.Client) error {
+	util.HttpTraceInfo("Resetting Keycloak user password...", span, loki, "ResetPasswordOfKeycloakUser", "")
 	jsonBody, err := json.Marshal(requestBody)
 	if err != nil {
 		return err
@@ -212,10 +222,11 @@ func (service *KeycloakService) ResetPasswordOfKeycloakUser(authorizationHeader 
 	return nil
 }
 
-func (service *KeycloakService) getUserIdFromLocation(resp *http.Response) (string, error) {
+func (service *KeycloakService) getUserIdFromLocation(resp *http.Response, span trace.Span, loki promtail.Client) (string, error) {
+	util.HttpTraceInfo("Getting user id from location...", span, loki, "getUserIdFromLocation", "")
 	if location := resp.Header.Get(domain.LocationHeader); location != "" {
 		parts := strings.Split(location, "/")
-		if value := service.checkIfFieldHasValue(parts); value != "" {
+		if value := service.checkIfFieldHasValue(parts, span, loki); value != "" {
 			return value, nil
 		}
 	}
@@ -223,7 +234,8 @@ func (service *KeycloakService) getUserIdFromLocation(resp *http.Response) (stri
 	return "", errors.New("user not created")
 }
 
-func (service *KeycloakService) checkIfFieldHasValue(parts []string) string {
+func (service *KeycloakService) checkIfFieldHasValue(parts []string, span trace.Span, loki promtail.Client) string {
+	util.HttpTraceInfo("Checking if field has value...", span, loki, "checkIfFieldHasValue", "")
 	if len(parts) > 0 {
 		lastPart := parts[len(parts)-1]
 		return lastPart

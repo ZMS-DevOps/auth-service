@@ -88,7 +88,7 @@ func (server *Server) initUserService(authService *application.AuthService, keyc
 }
 
 func (server *Server) initUserHandler(service *application.UserService) *api.UserHandler {
-	return api.NewUserHandler(service)
+	return api.NewUserHandler(service, server.traceProvider, server.loki)
 }
 
 func (server *Server) getBookingAddress() string {
