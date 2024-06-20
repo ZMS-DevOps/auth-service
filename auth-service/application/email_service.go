@@ -2,8 +2,11 @@ package application
 
 import (
 	"bytes"
+	"github.com/afiskon/promtail-client/promtail"
 	"github.com/go-mail/mail"
 	"github.com/mmmajder/zms-devops-auth-service/domain"
+	"github.com/mmmajder/zms-devops-auth-service/util"
+	"go.opentelemetry.io/otel/trace"
 	"html/template"
 	"log"
 )
@@ -14,7 +17,8 @@ func NewEmailService() *EmailService {
 	return &EmailService{}
 }
 
-func (service *EmailService) GetVerificationCodeEmailBody(receiverEmail string, verification domain.Verification) string {
+func (service *EmailService) GetVerificationCodeEmailBody(receiverEmail string, verification domain.Verification, span trace.Span, loki promtail.Client) string {
+	util.HttpTraceInfo("Getting verification code email body...", span, loki, "GetSpecialPrices", "")
 	t, _ := template.New("verification_email").Parse(service.getHtmlTemplate())
 	var body bytes.Buffer
 	if err := service.executeEmail(receiverEmail, verification, t, &body); err != nil {
@@ -24,7 +28,8 @@ func (service *EmailService) GetVerificationCodeEmailBody(receiverEmail string, 
 	return body.String()
 }
 
-func (service *EmailService) SendEmail(subject, body string) {
+func (service *EmailService) SendEmail(subject, body string, span trace.Span, loki promtail.Client) {
+	util.HttpTraceInfo("Sending email...", span, loki, "GetSpecialPrices", "")
 	m := mail.NewMessage()
 	m.SetHeader("From", domain.SenderEmailAddress)
 	m.SetHeader("To", domain.SenderEmailAddress)
